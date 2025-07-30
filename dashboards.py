@@ -7,7 +7,7 @@ import io
 from datetime import timedelta
 
 # === Carregar dados ===
-df = pd.read_excel('../data_raw/saida.xlsx', sheet_name='Crescimento (%)')
+df = pd.read_excel('data_raw/saida.xlsx', sheet_name='Crescimento (%)')
 df['Data'] = pd.to_datetime(df['Data']).dt.date  # remove hora
 df['Tamanho GB'] = df['Tamanho'] / (1024 ** 3)   # bytes → GB
 
