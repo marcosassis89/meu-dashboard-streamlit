@@ -7,6 +7,8 @@ import io
 from datetime import timedelta
 from statsmodels.tsa.arima.model import ARIMA
 
+# Atualização forçada para commit
+
 # === Carregar dados ===
 df = pd.read_excel('data_raw/saida.xlsx', sheet_name='Crescimento (%)')
 df['Data'] = pd.to_datetime(df['Data']).dt.date  # remove hora
