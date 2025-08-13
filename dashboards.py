@@ -13,14 +13,13 @@ from statsmodels.tsa.arima.model import ARIMA
 df = pd.read_excel('data_raw/saida.xlsx', sheet_name='Crescimento (%)')
 df['Data'] = pd.to_datetime(df['Data']).dt.date  # remove hora
 
-# Já está em MB, não precisa converter
-df['Tamanho MB'] = df['Tamanho (MB)']
+# Não precisa criar a coluna 'Tamanho MB', pois já existe 'Tamanho (MB)'
 
 # === Corrigir cálculo de crescimento percentual ===
 df = df.sort_values(['Base', 'Data'])
 def calcular_crescimento_percentual(grupo):
     grupo = grupo.sort_values('Data').copy()
-    tamanhos = grupo['Tamanho MB'].values
+    tamanhos = grupo['Tamanho (MB)'].values
     crescimento = [0.0]
     for i in range(1, len(tamanhos)):
         anterior = tamanhos[i - 1]
@@ -69,7 +68,7 @@ if any(df_filtrado['Crescimento (%)'] > 50):
 st.subheader("📈 Evolução do Tamanho com Suavização e Tendência")
 
 df_suave = df_filtrado.copy()
-df_suave['Tamanho MB Suave'] = df_suave.groupby('Base')['Tamanho MB'].transform(lambda x: x.rolling(window=3, min_periods=1).mean())
+df_suave['Tamanho MB Suave'] = df_suave.groupby('Base')['Tamanho (MB)'].transform(lambda x: x.rolling(window=3, min_periods=1).mean())
 
 fig1, ax1 = plt.subplots(figsize=(10, 4))
 sns.lineplot(data=df_suave, x='Data', y='Tamanho MB Suave', hue='Base', ax=ax1, marker='o')
@@ -86,7 +85,7 @@ st.subheader("🔮 Projeção ARIMA para os Próximos 90 Dias")
 for base in bases_selecionadas:
     df_base = df_filtrado[df_filtrado['Base'] == base].copy()
     df_base = df_base.sort_values('Data')
-    serie = df_base['Tamanho MB'].values
+    serie = df_base['Tamanho (MB)'].values
 
     # Ajusta ordem do ARIMA (pode ser ajustado conforme necessidade)
     ordem_arima = (1, 1, 1)
@@ -96,7 +95,7 @@ for base in bases_selecionadas:
         previsoes = modelo_fit.forecast(steps=90)
         datas_futuras = pd.date_range(df_base['Data'].max() + timedelta(days=1), periods=90)
         fig2, ax2 = plt.subplots(figsize=(10, 4))
-        sns.lineplot(data=df_base, x='Data', y='Tamanho MB', ax=ax2, marker='o', label='Histórico')
+        sns.lineplot(data=df_base, x='Data', y='Tamanho (MB)', ax=ax2, marker='o', label='Histórico')
         ax2.plot(datas_futuras, previsoes, linestyle='--', color='gray', label='Projeção ARIMA')
         ax2.set_xlabel("Data")
         ax2.set_ylabel("Tamanho projetado (MB)")
@@ -131,3 +130,52 @@ st.download_button(
     file_name='dados_filtrados.xlsx',
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
+
+# Filtrar último mês disponível
+ultimo_mes = df['Data'].max().month
+ultimo_ano = df['Data'].max().year
+df_ultimo_mes = df[(pd.to_datetime(df['Data']).dt.month == ultimo_mes) & (pd.to_datetime(df['Data']).dt.year == ultimo_ano)]
+
+# Gráfico: Top 10 bases do servidor 5
+df_s5 = df_ultimo_mes[df_ultimo_mes['Servidor'] == 's5']
+top10_s5 = df_s5.groupby('Base')['Tamanho (MB)'].sum().nlargest(10).reset_index()
+
+st.subheader("🏆 Top 10 Bases - Servidor 5 (Último mês)")
+fig_s5, ax_s5 = plt.subplots(figsize=(10, 4))
+sns.barplot(data=top10_s5, x='Base', y='Tamanho (MB)', color='gold', ax=ax_s5)
+ax_s5.set_title(f"Top 10 Bases - Servidor 5 ({ultimo_mes:02d}/{ultimo_ano})")
+ax_s5.set_xlabel("Base")
+ax_s5.set_ylabel("Tamanho (MB)")
+ax_s5.tick_params(axis='x', rotation=45)
+st.pyplot(fig_s5)
+
+# Gráfico: Top 10 bases do servidor 6
+df_s6 = df_ultimo_mes[df_ultimo_mes['Servidor'] == 's6']
+top10_s6 = df_s6.groupby('Base')['Tamanho (MB)'].sum().nlargest(10).reset_index()
+
+st.subheader("🏆 Top 10 Bases - Servidor 6 (Último mês)")
+fig_s6, ax_s6 = plt.subplots(figsize=(10, 4))
+sns.barplot(data=top10_s6, x='Base', y='Tamanho (MB)', color='deepskyblue', ax=ax_s6)
+ax_s6.set_title(f"Top 10 Bases - Servidor 6 ({ultimo_mes:02d}/{ultimo_ano})")
+ax_s6.set_xlabel("Base")
+ax_s6.set_ylabel("Tamanho (MB)")
+ax_s6.tick_params(axis='x', rotation=45)
+st.pyplot(fig_s6)
+
+# Gráfico: Total do servidor 5 no último mês
+total_s5 = df_s5['Tamanho (MB)'].sum()
+st.subheader("📦 Total de Dados - Servidor 5 (Último mês)")
+fig_total_s5, ax_total_s5 = plt.subplots(figsize=(4, 4))
+ax_total_s5.bar(['Servidor 5'], [total_s5], color='gold')
+ax_total_s5.set_ylabel("Tamanho Total (MB)")
+ax_total_s5.set_title(f"Total Servidor 5 ({ultimo_mes:02d}/{ultimo_ano})")
+st.pyplot(fig_total_s5)
+
+# Gráfico: Total do servidor 6 no último mês
+total_s6 = df_s6['Tamanho (MB)'].sum()
+st.subheader("📦 Total de Dados - Servidor 6 (Último mês)")
+fig_total_s6, ax_total_s6 = plt.subplots(figsize=(4, 4))
+ax_total_s6.bar(['Servidor 6'], [total_s6], color='deepskyblue')
+ax_total_s6.set_ylabel("Tamanho Total (MB)")
+ax_total_s6.set_title(f"Total Servidor 6 ({ultimo_mes:02d}/{ultimo_ano})")
+st.pyplot(fig_total_s6)
