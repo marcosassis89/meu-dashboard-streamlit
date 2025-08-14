@@ -119,8 +119,15 @@ st.pyplot(fig3)
 # === Ranking de crescimento ===
 def ranking_crescimento(df):
     st.subheader("🚀 Ranking de Crescimento (%)")
-    df_agg = df.groupby('Base')['Crescimento (%)'].mean().sort_values(ascending=False).reset_index()
-    st.dataframe(df_agg.head(10).rename(columns={'Crescimento (%)': 'Crescimento Médio (%)'}))
+    df_agg = df.groupby('Base').agg({
+        'Crescimento (%)': 'mean',
+        'Tamanho (MB)': lambda x: x.diff().mean()
+    }).sort_values('Crescimento (%)', ascending=False).reset_index()
+    df_agg = df_agg.rename(columns={
+        'Crescimento (%)': 'Crescimento Médio (%)',
+        'Tamanho (MB)': 'Crescimento Médio (MB)'
+    })
+    st.dataframe(df_agg.head(10))
 
 # Chamada da função (fora da definição)
 ranking_crescimento(df_filtrado)
