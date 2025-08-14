@@ -131,44 +131,56 @@ st.download_button(
     mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 )
 
-# Filtrar último registro disponível por base para o último mês
-df_ultimo_mes = df[(pd.to_datetime(df['Data']).dt.month == ultimo_mes) & (pd.to_datetime(df['Data']).dt.year == ultimo_ano)]
-df_ultimo_mes_atual = df_ultimo_mes.sort_values('Data').groupby(['Servidor', 'Base'], as_index=False).last()
+# === Definir último mês e ano com base na data mais recente ===
+ultima_data = pd.to_datetime(df['Data']).max()
+ultimo_mes = ultima_data.month
+ultimo_ano = ultima_data.year
 
-# Gráfico: Top 10 bases do servidor 5 (tamanho da data mais atual)
+# === Filtrar último registro por base no último mês ===
+df_ultimo_mes = df[
+    (pd.to_datetime(df['Data']).dt.month == ultimo_mes) &
+    (pd.to_datetime(df['Data']).dt.year == ultimo_ano)
+].copy()
+
+df_ultimo_mes_atual = (
+    df_ultimo_mes.sort_values('Data')
+    .groupby(['Servidor', 'Base'], as_index=False)
+    .last()
+)
+
+# === Função para gráfico Top 10 por servidor ===
+def plot_top10(df_servidor, servidor_nome, cor):
+    top10 = df_servidor.nlargest(10, 'Tamanho (MB)')
+    st.subheader(f"🏆 Top 10 Bases - Servidor {servidor_nome} ({ultimo_mes:02d}/{ultimo_ano})")
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.barplot(data=top10, x='Base', y='Tamanho (MB)', color=cor, ax=ax)
+    ax.set_title(f"Top 10 Bases - Servidor {servidor_nome} ({ultimo_mes:02d}/{ultimo_ano})")
+    ax.set_xlabel("Base")
+    ax.set_ylabel("Tamanho (MB)")
+    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, axis='y', linestyle='--', linewidth=0.5)
+    ax.grid(True, axis='x', linestyle='--', linewidth=0.5)
+    st.pyplot(fig)
+
+# === Gráficos Top 10 por servidor ===
 df_s5 = df_ultimo_mes_atual[df_ultimo_mes_atual['Servidor'] == 's5']
-top10_s5 = df_s5.nlargest(10, 'Tamanho (MB)')
-
-st.subheader("🏆 Top 10 Bases - Servidor 5 (Último mês)")
-fig_s5, ax_s5 = plt.subplots(figsize=(10, 4))
-sns.barplot(data=top10_s5, x='Base', y='Tamanho (MB)', color='gold', ax=ax_s5)
-ax_s5.set_title(f"Top 10 Bases - Servidor 5 ({ultimo_mes:02d}/{ultimo_ano})")
-ax_s5.set_xlabel("Base")
-ax_s5.set_ylabel("Tamanho (MB)")
-ax_s5.tick_params(axis='x', rotation=45)
-ax_s5.grid(True, axis='y', linestyle='--', linewidth=0.5)
-ax_s5.grid(True, axis='x', linestyle='--', linewidth=0.5)
-st.pyplot(fig_s5)
-
-# Gráfico: Top 10 bases do servidor 6 (tamanho da data mais atual)
 df_s6 = df_ultimo_mes_atual[df_ultimo_mes_atual['Servidor'] == 's6']
-top10_s6 = df_s6.nlargest(10, 'Tamanho (MB)')
 
-st.subheader("🏆 Top 10 Bases - Servidor 6 (Último mês)")
-fig_s6, ax_s6 = plt.subplots(figsize=(10, 4))
-sns.barplot(data=top10_s6, x='Base', y='Tamanho (MB)', color='deepskyblue', ax=ax_s6)
-ax_s6.set_title(f"Top 10 Bases - Servidor 6 ({ultimo_mes:02d}/{ultimo_ano})")
-ax_s6.set_xlabel("Base")
-ax_s6.set_ylabel("Tamanho (MB)")
-ax_s6.tick_params(axis='x', rotation=45)
-ax_s6.grid(True, axis='y', linestyle='--', linewidth=0.5)
-ax_s6.grid(True, axis='x', linestyle='--', linewidth=0.5)
-st.pyplot(fig_s6)
+if not df_s5.empty:
+    plot_top10(df_s5, '5', 'gold')
+else:
+    st.info("ℹ️ Nenhum dado disponível para o Servidor 5 no último mês.")
 
-# Gráfico unificado: Total do servidor 5 e 6 no último mês (tamanho da data mais atual)
+if not df_s6.empty:
+    plot_top10(df_s6, '6', 'deepskyblue')
+else:
+    st.info("ℹ️ Nenhum dado disponível para o Servidor 6 no último mês.")
+
+# === Gráfico unificado: Total por servidor ===
 total_s5 = df_s5['Tamanho (MB)'].sum()
 total_s6 = df_s6['Tamanho (MB)'].sum()
-st.subheader("📦 Total de Dados - Servidores 5 e 6 (Último mês)")
+
+st.subheader(f"📦 Total de Dados - Servidores 5 e 6 ({ultimo_mes:02d}/{ultimo_ano})")
 fig_total, ax_total = plt.subplots(figsize=(6, 4))
 ax_total.bar(['Servidor 5', 'Servidor 6'], [total_s5, total_s6], color=['gold', 'deepskyblue'])
 ax_total.set_ylabel("Tamanho Total (MB)")
@@ -176,3 +188,4 @@ ax_total.set_title(f"Total Servidores 5 e 6 ({ultimo_mes:02d}/{ultimo_ano})")
 ax_total.grid(True, axis='y', linestyle='--', linewidth=0.5)
 ax_total.grid(True, axis='x', linestyle='--', linewidth=0.5)
 st.pyplot(fig_total)
+
