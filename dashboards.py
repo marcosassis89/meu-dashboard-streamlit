@@ -117,11 +117,13 @@ ax3.grid(True, linestyle='--', linewidth=0.5)
 st.pyplot(fig3)
 
 # === Ranking de crescimento ===
-ranking_crescimento(df_filtrado)
 def ranking_crescimento(df):
     st.subheader("🚀 Ranking de Crescimento (%)")
     df_agg = df.groupby('Base')['Crescimento (%)'].mean().sort_values(ascending=False).reset_index()
     st.dataframe(df_agg.head(10).rename(columns={'Crescimento (%)': 'Crescimento Médio (%)'}))
+
+# Chamada da função (fora da definição)
+ranking_crescimento(df_filtrado)
 
 # === Tabela e download ===
 st.subheader("📋 Tabela de Dados Filtrados")
