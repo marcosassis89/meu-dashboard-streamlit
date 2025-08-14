@@ -116,6 +116,13 @@ ax3.set_title("Variação Percentual por Base")
 ax3.grid(True, linestyle='--', linewidth=0.5)
 st.pyplot(fig3)
 
+# === Ranking de crescimento ===
+ranking_crescimento(df_filtrado)
+def ranking_crescimento(df):
+    st.subheader("🚀 Ranking de Crescimento (%)")
+    df_agg = df.groupby('Base')['Crescimento (%)'].mean().sort_values(ascending=False).reset_index()
+    st.dataframe(df_agg.head(10).rename(columns={'Crescimento (%)': 'Crescimento Médio (%)'}))
+
 # === Tabela e download ===
 st.subheader("📋 Tabela de Dados Filtrados")
 st.dataframe(df_filtrado)
@@ -189,8 +196,4 @@ ax_total.grid(True, axis='y', linestyle='--', linewidth=0.5)
 ax_total.grid(True, axis='x', linestyle='--', linewidth=0.5)
 st.pyplot(fig_total)
 
-def ranking_crescimento(df):
-    st.subheader("🚀 Ranking de Crescimento (%)")
-    df_agg = df.groupby('Base')['Crescimento (%)'].mean().sort_values(ascending=False).reset_index()
-    st.dataframe(df_agg.head(10).rename(columns={'Crescimento (%)': 'Crescimento Médio (%)'}))
 
