@@ -206,6 +206,8 @@ ax_total.grid(True, axis='x', linestyle='--', linewidth=0.5)
 st.pyplot(fig_total)
 
 # === Crescimento do período para Servidor 5 e 6 ===
+st.markdown("### ✅ Log: Executando cálculo de crescimento por servidor")
+
 def crescimento_periodo(df_servidor):
     if df_servidor.empty:
         return 0
@@ -218,6 +220,8 @@ crescimento_s6 = crescimento_periodo(df_s6)
 
 st.markdown(f"**Crescimento do Servidor 5 no período:** {crescimento_s5:.2f} MB")
 st.markdown(f"**Crescimento do Servidor 6 no período:** {crescimento_s6:.2f} MB")
+
+st.success("✅ Cálculo de crescimento por servidor executado com sucesso!")
 
 # === Projeção ARIMA para o total dos servidores ===
 def projecao_arima_total(df_servidor):
@@ -236,6 +240,8 @@ def projecao_arima_total(df_servidor):
 proj_s5 = projecao_arima_total(df_s5)
 proj_s6 = projecao_arima_total(df_s6)
 
+st.markdown("### 🔄 Tentando gerar projeção ARIMA para servidores...")
+
 if proj_s5 is not None:
     st.markdown(f"**Projeção ARIMA para Servidor 5 em 90 dias:** {proj_s5:.2f} MB")
 else:
@@ -246,3 +252,4 @@ if proj_s6 is not None:
 else:
     st.markdown("**Projeção ARIMA para Servidor 6 em 90 dias:** Não disponível")
 
+st.info("ℹ️ Projeção ARIMA finalizada.")
