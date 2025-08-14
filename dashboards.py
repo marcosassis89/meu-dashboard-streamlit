@@ -205,4 +205,44 @@ ax_total.grid(True, axis='y', linestyle='--', linewidth=0.5)
 ax_total.grid(True, axis='x', linestyle='--', linewidth=0.5)
 st.pyplot(fig_total)
 
+# === Crescimento do período para Servidor 5 e 6 ===
+def crescimento_periodo(df_servidor):
+    if df_servidor.empty:
+        return 0
+    tamanho_inicial = df_servidor.sort_values('Data')['Tamanho (MB)'].iloc[0]
+    tamanho_final = df_servidor.sort_values('Data')['Tamanho (MB)'].iloc[-1]
+    return tamanho_final - tamanho_inicial
+
+crescimento_s5 = crescimento_periodo(df_s5)
+crescimento_s6 = crescimento_periodo(df_s6)
+
+st.markdown(f"**Crescimento do Servidor 5 no período:** {crescimento_s5:.2f} MB")
+st.markdown(f"**Crescimento do Servidor 6 no período:** {crescimento_s6:.2f} MB")
+
+# === Projeção ARIMA para o total dos servidores ===
+def projecao_arima_total(df_servidor):
+    if df_servidor.empty or len(df_servidor) < 3:
+        return None
+    serie = df_servidor.sort_values('Data')['Tamanho (MB)'].values
+    ordem_arima = (1, 1, 1)
+    try:
+        modelo = ARIMA(serie, order=ordem_arima)
+        modelo_fit = modelo.fit()
+        previsao_90 = modelo_fit.forecast(steps=90)[-1]
+        return previsao_90
+    except Exception:
+        return None
+
+proj_s5 = projecao_arima_total(df_s5)
+proj_s6 = projecao_arima_total(df_s6)
+
+if proj_s5 is not None:
+    st.markdown(f"**Projeção ARIMA para Servidor 5 em 90 dias:** {proj_s5:.2f} MB")
+else:
+    st.markdown("**Projeção ARIMA para Servidor 5 em 90 dias:** Não disponível")
+
+if proj_s6 is not None:
+    st.markdown(f"**Projeção ARIMA para Servidor 6 em 90 dias:** {proj_s6:.2f} MB")
+else:
+    st.markdown("**Projeção ARIMA para Servidor 6 em 90 dias:** Não disponível")
 
