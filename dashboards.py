@@ -261,3 +261,63 @@ st.pyplot(fig)
 crescimento_total = crescimento_por_base['Diferença (MB)'].sum()
 st.markdown(f"**📦 Crescimento total do servidor {servidor_selecionado} no período:** `{crescimento_total:.2f} MB`")
 
+# === Evolução do Tamanho por Base no Período Selecionado ===
+st.subheader("📈 Evolução do Tamanho por Base no Período Selecionado")
+
+# Limite de alerta para crescimento em MB
+limite_alerta_mb = st.slider("Defina o limite de alerta para crescimento (MB):", min_value=1.0, max_value=100.0, value=20.0)
+
+# Calcular crescimento absoluto e percentual por base
+df_evolucao = df_filtrado.sort_values(['Base', 'Data']).copy()
+bases = df_evolucao['Base'].unique()
+
+dados_crescimento = []
+for base in bases:
+    df_base = df_evolucao[df_evolucao['Base'] == base]
+    if len(df_base) < 2:
+        continue
+    tamanho_inicial = df_base['Tamanho (MB)'].iloc[0]
+    tamanho_final = df_base['Tamanho (MB)'].iloc[-1]
+    crescimento_mb = tamanho_final - tamanho_inicial
+    crescimento_pct = ((tamanho_final - tamanho_inicial) / tamanho_inicial) * 100 if tamanho_inicial != 0 else 0
+    dados_crescimento.append({
+        'Base': base,
+        'Tamanho Inicial (MB)': tamanho_inicial,
+        'Tamanho Final (MB)': tamanho_final,
+        'Crescimento (MB)': crescimento_mb,
+        'Crescimento (%)': crescimento_pct
+    })
+
+df_crescimento = pd.DataFrame(dados_crescimento)
+df_crescimento = df_crescimento.sort_values('Crescimento (MB)', ascending=False)
+
+# Destacar bases com crescimento acima do limite
+bases_alerta = df_crescimento[df_crescimento['Crescimento (MB)'] > limite_alerta_mb]
+if not bases_alerta.empty:
+    st.warning(f"🚨 {len(bases_alerta)} base(s) tiveram crescimento acima de {limite_alerta_mb:.2f} MB no período selecionado.")
+    st.dataframe(bases_alerta.style.format({
+        'Tamanho Inicial (MB)': '{:.2f}',
+        'Tamanho Final (MB)': '{:.2f}',
+        'Crescimento (MB)': '{:.2f}',
+        'Crescimento (%)': '{:.2f}%'
+    }))
+else:
+    st.info("✅ Nenhuma base ultrapassou o limite de crescimento definido.")
+
+# Mostrar tabela completa
+st.markdown("### 📋 Crescimento por Base no Período")
+st.dataframe(df_crescimento.style.format({
+    'Tamanho Inicial (MB)': '{:.2f}',
+    'Tamanho Final (MB)': '{:.2f}',
+    'Crescimento (MB)': '{:.2f}',
+    'Crescimento (%)': '{:.2f}%'
+}))
+
+# Gráfico de linha por base
+fig_evolucao, ax_evolucao = plt.subplots(figsize=(12, 6))
+sns.lineplot(data=df_evolucao, x='Data', y='Tamanho (MB)', hue='Base', marker='o', ax=ax_evolucao)
+ax_evolucao.set_title(f"Evolução do Tamanho por Base - Servidor {servidor_selecionado}")
+ax_evolucao.set_xlabel("Data")
+ax_evolucao.set_ylabel("Tamanho (MB)")
+ax_evolucao.grid(True, linestyle='--', linewidth=0.5)
+st.pyplot(fig_evolucao)
