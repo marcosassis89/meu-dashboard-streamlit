@@ -103,15 +103,28 @@ for base in bases_selecionadas:
         modelo_fit = modelo.fit()
         previsoes = modelo_fit.forecast(steps=90)
         datas_futuras = pd.date_range(df_base['Data'].max() + timedelta(days=1), periods=90)
-        fig2, ax2 = plt.subplots(figsize=(10, 4))
-        sns.lineplot(data=df_base, x='Data', y='Tamanho (MB)', ax=ax2, marker='o', label='Histórico')
-        ax2.plot(datas_futuras, previsoes, linestyle='--', color='gray', label='Projeção ARIMA')
-        ax2.set_xlabel("Data")
-        ax2.set_ylabel("Tamanho projetado (MB)")
-        ax2.set_title(f"Projeção ARIMA nos Próximos 90 Dias - {base}")
-        ax2.grid(True, linestyle='--', linewidth=0.5)
-        ax2.legend()
-        st.pyplot(fig2)
+        df_proj = pd.DataFrame({
+            'Data': list(df_base['Data']) + list(datas_futuras),
+            'Tamanho (MB)': list(df_base['Tamanho (MB)']) + list(previsoes),
+            'Tipo': ['Histórico'] * len(df_base) + ['Projeção'] * len(previsoes),
+            'Base': [base] * (len(df_base) + len(previsoes))
+        })
+        fig2_plotly = px.line(
+            df_proj,
+            x='Data',
+            y='Tamanho (MB)',
+            color='Tipo',
+            line_dash='Tipo',
+            title=f"Projeção ARIMA nos Próximos 90 Dias - {base}",
+            labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho projetado (MB)', 'Tipo': 'Tipo'}
+        )
+        fig2_plotly.update_layout(
+            legend_title_text='Tipo',
+            xaxis=dict(showgrid=True, gridcolor='lightgray'),
+            yaxis=dict(showgrid=True, gridcolor='lightgray'),
+            height=400
+        )
+        st.plotly_chart(fig2_plotly, use_container_width=True)
     except Exception as e:
         st.warning(f"Não foi possível gerar ARIMA para a base {base}: {e}")
 
