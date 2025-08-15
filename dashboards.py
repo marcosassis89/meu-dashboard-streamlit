@@ -66,19 +66,24 @@ if any(df_filtrado['Crescimento (%)'] > 50):
     st.warning("🚨 Algumas bases tiveram crescimento acima de 50%!")
 
 # === Gráfico com suavização e tendência polinomial ===
-st.subheader("📈 Evolução do Tamanho com Suavização e Tendência")
+st.subheader("📈 Evolução do Tamanho com Suavização e Tendência (Interativo)")
 
-df_suave = df_filtrado.copy()
-df_suave['Tamanho MB Suave'] = df_suave.groupby('Base')['Tamanho (MB)'].transform(lambda x: x.rolling(window=3, min_periods=1).mean())
-
-fig1, ax1 = plt.subplots(figsize=(10, 4))
-sns.lineplot(data=df_suave, x='Data', y='Tamanho MB Suave', hue='Base', ax=ax1, marker='o')
-ax1.set_xlabel("Data")
-ax1.set_ylabel("Tamanho (MB)")
-ax1.set_title("Tamanho com Média Móvel")
-ax1.grid(True, linestyle='--', linewidth=0.5)
-ax1.legend()
-st.pyplot(fig1)
+fig1_plotly = px.line(
+    df_suave,
+    x='Data',
+    y='Tamanho MB Suave',
+    color='Base',
+    markers=True,
+    title="Tamanho com Média Móvel",
+    labels={'Data': 'Data', 'Tamanho MB Suave': 'Tamanho (MB)', 'Base': 'Base'}
+)
+fig1_plotly.update_layout(
+    legend_title_text='Base',
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray'),
+    height=400
+)
+st.plotly_chart(fig1_plotly, use_container_width=True)
 
 # === Projeção ARIMA ===
 st.subheader("🔮 Projeção ARIMA para os Próximos 90 Dias")
