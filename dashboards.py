@@ -232,21 +232,35 @@ df_filtrado = df[
     (df['Data'] <= pd.to_datetime(data_fim))
 ].copy()
 
-# Agrupar por base e somar crescimento
-crescimento_por_base = df_filtrado.groupby('Base')['Diferença (MB)'].sum().reset_index()
-crescimento_por_base = crescimento_por_base.sort_values('Diferença (MB)', ascending=False)
+# Agrupar por base e calcular crescimento real (final - inicial)
+crescimento_por_base = []
+for base in df_filtrado['Base'].unique():
+    df_base = df_filtrado[df_filtrado['Base'] == base].sort_values('Data')
+    if len(df_base) < 2:
+        continue
+    tamanho_inicial = df_base['Tamanho (MB)'].iloc[0]
+    tamanho_final = df_base['Tamanho (MB)'].iloc[-1]
+    crescimento_mb = tamanho_final - tamanho_inicial
+    crescimento_por_base.append({
+        'Base': base,
+        'Tamanho Inicial (MB)': tamanho_inicial,
+        'Tamanho Final (MB)': tamanho_final,
+        'Crescimento (MB)': crescimento_mb
+    })
+
+crescimento_por_base_df = pd.DataFrame(crescimento_por_base).sort_values('Crescimento (MB)', ascending=False)
 
 # Mostrar tabela
-st.dataframe(crescimento_por_base.rename(columns={'Diferença (MB)': 'Crescimento Total (MB)'}))
+st.dataframe(crescimento_por_base_df)
 
 # Slider para limitar número de bases no gráfico
 top_n = st.slider("Número de bases a exibir no gráfico:", min_value=5, max_value=30, value=15)
-dados_grafico = crescimento_por_base.head(top_n)
+dados_grafico = crescimento_por_base_df.head(top_n)
 
 # Gráfico horizontal para melhor legibilidade
 fig, ax = plt.subplots(figsize=(10, len(dados_grafico) * 0.4))
 palette = sns.color_palette("Purples", len(dados_grafico)) if servidor_selecionado == 's5' else sns.color_palette("magma", len(dados_grafico))
-sns.barplot(data=dados_grafico, y='Base', x='Diferença (MB)', palette=palette, ax=ax)
+sns.barplot(data=dados_grafico, y='Base', x='Crescimento (MB)', palette=palette, ax=ax)
 
 # Títulos e rótulos
 ax.set_title(f"Crescimento por Base - Servidor {servidor_selecionado} ({data_inicio} a {data_fim})")
@@ -258,7 +272,7 @@ ax.grid(True, axis='x', linestyle='--', linewidth=0.5)
 st.pyplot(fig)
 
 # Mostrar crescimento total
-crescimento_total = crescimento_por_base['Diferença (MB)'].sum()
+crescimento_total = crescimento_por_base_df['Crescimento (MB)'].sum()
 st.markdown(f"**📦 Crescimento total do servidor {servidor_selecionado} no período:** `{crescimento_total:.2f} MB`")
 
 # === Evolução do Tamanho por Base no Período Selecionado ===
