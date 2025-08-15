@@ -3,6 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import streamlit as st
 import numpy as np
+import plotly.express as px
 import io
 from datetime import timedelta
 from statsmodels.tsa.arima.model import ARIMA
@@ -328,10 +329,21 @@ st.dataframe(df_crescimento.style.format({
 }))
 
 # Gráfico de linha por base
-fig_evolucao, ax_evolucao = plt.subplots(figsize=(12, 6))
-sns.lineplot(data=df_evolucao, x='Data', y='Tamanho (MB)', hue='Base', marker='o', ax=ax_evolucao)
-ax_evolucao.set_title(f"Evolução do Tamanho por Base - Servidor {servidor_selecionado}")
-ax_evolucao.set_xlabel("Data")
-ax_evolucao.set_ylabel("Tamanho (MB)")
-ax_evolucao.grid(True, linestyle='--', linewidth=0.5)
-st.pyplot(fig_evolucao)
+st.markdown("### 📈 Evolução Interativa do Tamanho por Base")
+
+fig_plotly = px.line(
+    df_evolucao,
+    x='Data',
+    y='Tamanho (MB)',
+    color='Base',
+    markers=True,
+    title=f"Evolução do Tamanho por Base - Servidor {servidor_selecionado}",
+    labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho (MB)', 'Base': 'Base'}
+)
+fig_plotly.update_layout(
+    legend_title_text='Base',
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray'),
+    height=600
+)
+st.plotly_chart(fig_plotly, use_container_width=True)
