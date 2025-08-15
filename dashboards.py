@@ -205,51 +205,52 @@ ax_total.grid(True, axis='y', linestyle='--', linewidth=0.5)
 ax_total.grid(True, axis='x', linestyle='--', linewidth=0.5)
 st.pyplot(fig_total)
 
-# === Crescimento do período para Servidor 5 e 6 ===
-st.markdown("### ✅ Log: Executando cálculo de crescimento por servidor")
+# === Crescimento por base com seleção de servidor e filtro por data ===
+st.subheader("📊 Crescimento por Base por Servidor e Período")
 
-def crescimento_periodo(df_servidor):
-    if df_servidor.empty:
-        return 0
-    tamanho_inicial = df_servidor.sort_values('Data')['Tamanho (MB)'].iloc[0]
-    tamanho_final = df_servidor.sort_values('Data')['Tamanho (MB)'].iloc[-1]
-    return tamanho_final - tamanho_inicial
+# Garantir que a coluna 'Diferença (MB)' esteja em formato numérico
+df['Diferença (MB)'] = pd.to_numeric(df['Diferença (MB)'], errors='coerce')
 
-crescimento_s5 = crescimento_periodo(df_s5)
-crescimento_s6 = crescimento_periodo(df_s6)
+# Garantir que a coluna de data esteja em formato datetime
+df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
 
-st.markdown(f"**Crescimento do Servidor 5 no período:** {crescimento_s5:.2f} MB")
-st.markdown(f"**Crescimento do Servidor 6 no período:** {crescimento_s6:.2f} MB")
+# Selectbox para escolha do servidor
+servidor_selecionado = st.selectbox("Selecione o servidor:", options=['s5', 's6'])
 
-st.success("✅ Cálculo de crescimento por servidor executado com sucesso!")
+# Filtro de data
+data_min = df['Data'].min()
+data_max = df['Data'].max()
+data_inicio, data_fim = st.date_input("Selecione o intervalo de datas:",
+                                      value=(data_min, data_max),
+                                      min_value=data_min,
+                                      max_value=data_max)
 
-# === Projeção ARIMA para o total dos servidores ===
-def projecao_arima_total(df_servidor):
-    if df_servidor.empty or len(df_servidor) < 3:
-        return None
-    serie = df_servidor.sort_values('Data')['Tamanho (MB)'].values
-    ordem_arima = (1, 1, 1)
-    try:
-        modelo = ARIMA(serie, order=ordem_arima)
-        modelo_fit = modelo.fit()
-        previsao_90 = modelo_fit.forecast(steps=90)[-1]
-        return previsao_90
-    except Exception:
-        return None
+# Filtrar dados conforme seleção
+df_filtrado = df[
+    (df['Servidor'] == servidor_selecionado) &
+    (df['Data'] >= pd.to_datetime(data_inicio)) &
+    (df['Data'] <= pd.to_datetime(data_fim))
+].copy()
 
-proj_s5 = projecao_arima_total(df_s5)
-proj_s6 = projecao_arima_total(df_s6)
+# Agrupar por base e somar crescimento
+crescimento_por_base = df_filtrado.groupby('Base')['Diferença (MB)'].sum().reset_index()
+crescimento_por_base = crescimento_por_base.sort_values('Diferença (MB)', ascending=False)
 
-st.markdown("### 🔄 Tentando gerar projeção ARIMA para servidores...")
+# Mostrar tabela
+st.dataframe(crescimento_por_base.rename(columns={'Diferença (MB)': 'Crescimento Total (MB)'}))
 
-if proj_s5 is not None:
-    st.markdown(f"**Projeção ARIMA para Servidor 5 em 90 dias:** {proj_s5:.2f} MB")
-else:
-    st.markdown("**Projeção ARIMA para Servidor 5 em 90 dias:** Não disponível")
+# Mostrar gráfico de barras
+fig, ax = plt.subplots(figsize=(10, 4))
+palette = 'viridis' if servidor_selecionado == 's5' else 'magma'
+sns.barplot(data=crescimento_por_base, x='Base', y='Diferença (MB)', palette=palette, ax=ax)
+ax.set_title(f"Crescimento por Base - Servidor {servidor_selecionado} ({data_inicio} a {data_fim})")
+ax.set_xlabel("Base")
+ax.set_ylabel("Crescimento (MB)")
+ax.tick_params(axis='x', rotation=45)
+ax.grid(True, axis='y', linestyle='--', linewidth=0.5)
+st.pyplot(fig)
 
-if proj_s6 is not None:
-    st.markdown(f"**Projeção ARIMA para Servidor 6 em 90 dias:** {proj_s6:.2f} MB")
-else:
-    st.markdown("**Projeção ARIMA para Servidor 6 em 90 dias:** Não disponível")
+# Mostrar crescimento total
+crescimento_total = crescimento_por_base['Diferença (MB)'].sum()
+st.markdown(f"**📦 Crescimento total do servidor {servidor_selecionado} no período:** `{crescimento_total:.2f} MB`")
 
-st.info("ℹ️ Projeção ARIMA finalizada.")
