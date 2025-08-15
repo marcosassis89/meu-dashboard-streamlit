@@ -239,15 +239,22 @@ crescimento_por_base = crescimento_por_base.sort_values('Diferença (MB)', ascen
 # Mostrar tabela
 st.dataframe(crescimento_por_base.rename(columns={'Diferença (MB)': 'Crescimento Total (MB)'}))
 
-# Mostrar gráfico de barras
-fig, ax = plt.subplots(figsize=(10, 4))
-palette = 'viridis' if servidor_selecionado == 's5' else 'magma'
-sns.barplot(data=crescimento_por_base, x='Base', y='Diferença (MB)', palette=palette, ax=ax)
+# Slider para limitar número de bases no gráfico
+top_n = st.slider("Número de bases a exibir no gráfico:", min_value=5, max_value=30, value=15)
+dados_grafico = crescimento_por_base.head(top_n)
+
+# Gráfico horizontal para melhor legibilidade
+fig, ax = plt.subplots(figsize=(10, len(dados_grafico) * 0.4))
+palette = sns.color_palette("Purples", len(dados_grafico)) if servidor_selecionado == 's5' else sns.color_palette("magma", len(dados_grafico))
+sns.barplot(data=dados_grafico, y='Base', x='Diferença (MB)', palette=palette, ax=ax)
+
+# Títulos e rótulos
 ax.set_title(f"Crescimento por Base - Servidor {servidor_selecionado} ({data_inicio} a {data_fim})")
-ax.set_xlabel("Base")
-ax.set_ylabel("Crescimento (MB)")
-ax.tick_params(axis='x', rotation=45)
-ax.grid(True, axis='y', linestyle='--', linewidth=0.5)
+ax.set_xlabel("Crescimento (MB)")
+ax.set_ylabel("Base")
+ax.grid(True, axis='x', linestyle='--', linewidth=0.5)
+
+# Exibir gráfico
 st.pyplot(fig)
 
 # Mostrar crescimento total
