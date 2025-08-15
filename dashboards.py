@@ -68,6 +68,9 @@ if any(df_filtrado['Crescimento (%)'] > 50):
 # === Gráfico com suavização e tendência polinomial ===
 st.subheader("📈 Evolução do Tamanho com Suavização e Tendência (Interativo)")
 
+df_suave = df_filtrado.copy()
+df_suave['Tamanho MB Suave'] = df_suave.groupby('Base')['Tamanho (MB)'].transform(lambda x: x.rolling(window=3, min_periods=1).mean())
+
 fig1_plotly = px.line(
     df_suave,
     x='Data',
