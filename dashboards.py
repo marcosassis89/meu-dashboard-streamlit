@@ -129,14 +129,24 @@ for base in bases_selecionadas:
         st.warning(f"Não foi possível gerar ARIMA para a base {base}: {e}")
 
 # === Crescimento percentual ===
-st.subheader("📉 Crescimento Percentual (%)")
-fig3, ax3 = plt.subplots(figsize=(10, 4))
-sns.lineplot(data=df_filtrado, x='Data', y='Crescimento (%)', hue='Base', ax=ax3, marker='o', palette='Set2')
-ax3.set_xlabel("Data")
-ax3.set_ylabel("Crescimento (%)")
-ax3.set_title("Variação Percentual por Base")
-ax3.grid(True, linestyle='--', linewidth=0.5)
-st.pyplot(fig3)
+st.subheader("📉 Crescimento Percentual (%) (Interativo)")
+
+fig3_plotly = px.line(
+    df_filtrado,
+    x='Data',
+    y='Crescimento (%)',
+    color='Base',
+    markers=True,
+    title="Variação Percentual por Base",
+    labels={'Data': 'Data', 'Crescimento (%)': 'Crescimento (%)', 'Base': 'Base'}
+)
+fig3_plotly.update_layout(
+    legend_title_text='Base',
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray'),
+    height=400
+)
+st.plotly_chart(fig3_plotly, use_container_width=True)
 
 # === Ranking de crescimento ===
 def ranking_crescimento(df):
