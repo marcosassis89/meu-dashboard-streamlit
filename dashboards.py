@@ -150,8 +150,9 @@ st.plotly_chart(fig3_plotly, use_container_width=True)
 
 # === Ranking de crescimento ===
 def ranking_crescimento(df):
-    st.subheader("🚀 Ranking de Crescimento (%)")
-    df_agg = df.groupby('Base').agg({
+    st.subheader("🚀 Ranking de Crescimento (%) (Interativo)")
+
+    df_agg = df_filtrado.groupby('Base').agg({
         'Crescimento (%)': 'mean',
         'Tamanho (MB)': lambda x: x.diff().mean()
     }).sort_values('Crescimento (%)', ascending=False).reset_index()
@@ -159,7 +160,21 @@ def ranking_crescimento(df):
         'Crescimento (%)': 'Crescimento Médio (%)',
         'Tamanho (MB)': 'Crescimento Médio (MB)'
     })
-    st.dataframe(df_agg.head(10))
+
+    fig4_plotly = px.bar(
+        df_agg.head(10),
+        x='Crescimento Médio (%)',
+        y='Base',
+        orientation='h',
+        title="Ranking de Crescimento (%)",
+        labels={'Crescimento Médio (%)': 'Crescimento Médio (%)', 'Base': 'Base'}
+    )
+    fig4_plotly.update_layout(
+        xaxis=dict(showgrid=True, gridcolor='lightgray'),
+        yaxis=dict(showgrid=True, gridcolor='lightgray'),
+        height=400
+    )
+    st.plotly_chart(fig4_plotly, use_container_width=True)
 
 # Chamada da função (fora da definição)
 ranking_crescimento(df_filtrado)
