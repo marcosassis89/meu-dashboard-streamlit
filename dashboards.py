@@ -243,14 +243,25 @@ else:
 total_s5 = df_s5['Tamanho (MB)'].sum()
 total_s6 = df_s6['Tamanho (MB)'].sum()
 
-st.subheader(f"📦 Total de Dados - Servidores 5 e 6 ({ultimo_mes:02d}/{ultimo_ano})")
-fig_total, ax_total = plt.subplots(figsize=(6, 4))
-ax_total.bar(['Servidor 5', 'Servidor 6'], [total_s5, total_s6], color=['gold', 'deepskyblue'])
-ax_total.set_ylabel("Tamanho Total (MB)")
-ax_total.set_title(f"Total Servidores 5 e 6 ({ultimo_mes:02d}/{ultimo_ano})")
-ax_total.grid(True, axis='y', linestyle='--', linewidth=0.5)
-ax_total.grid(True, axis='x', linestyle='--', linewidth=0.5)
-st.pyplot(fig_total)
+df_total = pd.DataFrame({
+    'Servidor': ['s5', 's6'],
+    'Tamanho Total (MB)': [total_s5, total_s6]
+})
+
+fig_total = px.bar(
+    df_total,
+    x='Servidor',
+    y='Tamanho Total (MB)',
+    title="Total Servidores 5 e 6 (06/2025)",
+    color='Servidor',
+    text='Tamanho Total (MB)'
+)
+fig_total.update_layout(
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray'),
+    height=400
+)
+st.plotly_chart(fig_total, use_container_width=True)
 
 # === Crescimento por base com seleção de servidor e filtro por data ===
 st.subheader("📊 Crescimento por Base por Servidor e Período")
