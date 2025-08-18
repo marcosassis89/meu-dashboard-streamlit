@@ -385,16 +385,26 @@ st.dataframe(df_crescimento.style.format({
     'Crescimento (%)': '{:.2f}%'
 }))
 
-# Gráfico de linha por base
-st.markdown("### 📈 Evolução Interativa do Tamanho por Base")
+# Slider para definir o percentual mínimo de crescimento
+percentual_minimo = st.slider(
+    "Percentual mínimo de crescimento para exibir no gráfico (%)",
+    min_value=0.0, max_value=50.0, value=5.0, step=0.5
+)
+
+# Filtrar as bases que atingiram o percentual mínimo
+bases_filtradas = df_crescimento[df_crescimento['Crescimento (%)'] >= percentual_minimo]['Base'].tolist()
+df_evolucao_filtrada = df_evolucao[df_evolucao['Base'].isin(bases_filtradas)]
+
+# Gráfico de linha por base (apenas bases filtradas)
+st.markdown("### 📈 Evolução Interativa do Tamanho por Base (Filtrado pelo crescimento mínimo)")
 
 fig_plotly = px.line(
-    df_evolucao,
+    df_evolucao_filtrada,
     x='Data',
     y='Tamanho (MB)',
     color='Base',
     markers=True,
-    title=f"Evolução do Tamanho por Base - Servidor {servidor_selecionado}",
+    title=f"Evolução do Tamanho por Base - Servidor {servidor_selecionado} (Crescimento ≥ {percentual_minimo:.1f}%)",
     labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho (MB)', 'Base': 'Base'}
 )
 fig_plotly.update_layout(
