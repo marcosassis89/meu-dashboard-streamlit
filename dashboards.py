@@ -239,29 +239,31 @@ if not df_s6.empty:
 else:
     st.info("ℹ️ Nenhum dado disponível para o Servidor 6 no último mês.")
 
-# === Gráfico unificado: Total por servidor ===
-total_s5 = df_s5['Tamanho (MB)'].sum()
-total_s6 = df_s6['Tamanho (MB)'].sum()
-
-df_total = pd.DataFrame({
-    'Servidor': ['s5', 's6'],
-    'Tamanho Total (MB)': [total_s5, total_s6]
-})
-
-fig_total = px.bar(
-    df_total,
-    x='Servidor',
-    y='Tamanho Total (MB)',
-    title="Total Servidores 5 e 6 (06/2025)",
-    color='Servidor',
-    text='Tamanho Total (MB)'
+# Agrupa por servidor e data, somando o tamanho total das bases
+df_total_evolucao = (
+    df.groupby(['Servidor', 'Data'], as_index=False)['Tamanho (MB)'].sum()
+    .sort_values(['Servidor', 'Data'])
 )
-fig_total.update_layout(
+
+# Gráfico de linha interativo: evolução do total por servidor ao longo do tempo
+st.subheader("📈 Evolução do Total de Dados por Servidor")
+
+fig_evolucao_total = px.line(
+    df_total_evolucao,
+    x='Data',
+    y='Tamanho (MB)',
+    color='Servidor',
+    markers=True,
+    title="Evolução do Total de Dados por Servidor",
+    labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho Total (MB)', 'Servidor': 'Servidor'}
+)
+fig_evolucao_total.update_layout(
+    legend_title_text='Servidor',
     xaxis=dict(showgrid=True, gridcolor='lightgray'),
     yaxis=dict(showgrid=True, gridcolor='lightgray'),
     height=400
 )
-st.plotly_chart(fig_total, use_container_width=True)
+st.plotly_chart(fig_evolucao_total, use_container_width=True)
 
 # === Crescimento por base com seleção de servidor e filtro por data ===
 st.subheader("📊 Crescimento por Base por Servidor e Período")
