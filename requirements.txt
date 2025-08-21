@@ -131,3 +131,4 @@ widgetsnbextension==4.0.14
 xlsxwriter==3.2.5
 statsmodels
 plotly
+pmdarima==2.0.4
