@@ -5,7 +5,7 @@ import streamlit as st
 import numpy as np
 import plotly.express as px
 import io
-import pmdarima as pm
+#import pmdarima as pm
 from datetime import timedelta
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.stattools import adfuller
