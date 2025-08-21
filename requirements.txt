@@ -129,6 +129,6 @@ webencodings==0.5.1
 websocket-client==1.8.0
 widgetsnbextension==4.0.14
 xlsxwriter==3.2.5
-statsmodels
-plotly
+statsmodels==0.14.0
+plotly==5.22.0
 pmdarima==2.0.4
