@@ -98,32 +98,12 @@ for base in bases_selecionadas:
     df_base = df_base.sort_values('Data')
     serie = df_base['Tamanho (MB)'].values
 
-    # Verifica estacionariedade
-    resultado_adf = adfuller(serie)
-    estacionaria = resultado_adf[1] < 0.05
-
-    # Aplica log se não for estacionária
-    if not estacionaria:
-        serie_transformada = np.log(serie)
-        transformada = True
-    else:
-        serie_transformada = serie
-        transformada = False
-
+    # Ajusta ordem do ARIMA (pode ser ajustado conforme necessidade)
+    ordem_arima = (1, 1, 1)
     try:
-        # Encontra melhor ordem com auto_arima
-        modelo_auto = pm.auto_arima(serie_transformada, seasonal=False, stepwise=True, suppress_warnings=True)
-        ordem_arima = modelo_auto.order
-
-        # Ajusta modelo ARIMA
-        modelo = ARIMA(serie_transformada, order=ordem_arima)
+        modelo = ARIMA(serie, order=ordem_arima)
         modelo_fit = modelo.fit()
         previsoes = modelo_fit.forecast(steps=90)
-
-        # Reverte transformação log
-        if transformada:
-            previsoes = np.exp(previsoes)
-
         datas_futuras = pd.date_range(df_base['Data'].max() + timedelta(days=1), periods=90)
         df_proj = pd.DataFrame({
             'Data': list(df_base['Data']) + list(datas_futuras),
@@ -131,8 +111,6 @@ for base in bases_selecionadas:
             'Tipo': ['Histórico'] * len(df_base) + ['Projeção'] * len(previsoes),
             'Base': [base] * (len(df_base) + len(previsoes))
         })
-
-        # Gráfico interativo
         fig2_plotly = px.line(
             df_proj,
             x='Data',
@@ -149,16 +127,6 @@ for base in bases_selecionadas:
             height=400
         )
         st.plotly_chart(fig2_plotly, use_container_width=True)
-
-        # Visualização dos resíduos
-        st.subheader("📉 Resíduos do Modelo ARIMA")
-        residuos = modelo_fit.resid
-        fig_residuos, ax = plt.subplots()
-        ax.plot(residuos)
-        ax.set_title(f"Resíduos - {base}")
-        ax.grid(True)
-        st.pyplot(fig_residuos)
-
     except Exception as e:
         st.warning(f"Não foi possível gerar ARIMA para a base {base}: {e}")
 
