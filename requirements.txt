@@ -83,6 +83,7 @@ plotly==5.22.0
 pmdarima==2.0.4
 prometheus_client==0.22.0
 prompt_toolkit==3.0.51
+prophet
 protobuf==6.31.1
 psutil==7.0.0
 ptyprocess==0.7.0

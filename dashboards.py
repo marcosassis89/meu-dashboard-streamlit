@@ -8,6 +8,7 @@ import io
 from datetime import timedelta
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.stattools import adfuller
+from prophet import Prophet
 
 # Atualização forçada para commit
 
@@ -90,44 +91,46 @@ fig1_plotly.update_layout(
 st.plotly_chart(fig1_plotly, use_container_width=True)
 
 # === Projeção ARIMA ===
-st.subheader("🔮 Projeção ARIMA para os Próximos 90 Dias")
+st.subheader("🔮 Projeção Prophet para os Próximos 90 Dias")
 
 for base in bases_selecionadas:
     df_base = df_filtrado[df_filtrado['Base'] == base].copy()
     df_base = df_base.sort_values('Data')
-    serie = df_base['Tamanho (MB)'].values
+    # Prophet exige colunas 'ds' (data) e 'y' (valor)
+    df_prophet = df_base.rename(columns={'Data': 'ds', 'Tamanho (MB)': 'y'})[['ds', 'y']]
+    df_prophet['ds'] = pd.to_datetime(df_prophet['ds'])
 
-    # Ajusta ordem do ARIMA (pode ser ajustado conforme necessidade)
-    ordem_arima = (30, 1, 1)
     try:
-        modelo = ARIMA(serie, order=ordem_arima)
-        modelo_fit = modelo.fit()
-        previsoes = modelo_fit.forecast(steps=90)
-        datas_futuras = pd.date_range(df_base['Data'].max() + timedelta(days=1), periods=90)
+        modelo = Prophet()
+        modelo.fit(df_prophet)
+        # Gerar datas futuras
+        datas_futuras = modelo.make_future_dataframe(periods=90)
+        previsoes = modelo.predict(datas_futuras)
+        # Montar DataFrame para gráfico
         df_proj = pd.DataFrame({
-            'Data': list(df_base['Data']) + list(datas_futuras),
-            'Tamanho (MB)': list(df_base['Tamanho (MB)']) + list(previsoes),
-            'Tipo': ['Histórico'] * len(df_base) + ['Projeção'] * len(previsoes),
-            'Base': [base] * (len(df_base) + len(previsoes))
+            'Data': list(df_prophet['ds']) + list(previsoes['ds'][-90:]),
+            'Tamanho (MB)': list(df_prophet['y']) + list(previsoes['yhat'][-90:]),
+            'Tipo': ['Histórico'] * len(df_prophet) + ['Projeção'] * 90,
+            'Base': [base] * (len(df_prophet) + 90)
         })
-        fig2_plotly = px.line(
+        fig_prophet = px.line(
             df_proj,
             x='Data',
             y='Tamanho (MB)',
             color='Tipo',
             line_dash='Tipo',
-            title=f"Projeção ARIMA nos Próximos 90 Dias - {base}",
+            title=f"Projeção Prophet nos Próximos 90 Dias - {base}",
             labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho projetado (MB)', 'Tipo': 'Tipo'}
         )
-        fig2_plotly.update_layout(
+        fig_prophet.update_layout(
             legend_title_text='Tipo',
             xaxis=dict(showgrid=True, gridcolor='lightgray'),
             yaxis=dict(showgrid=True, gridcolor='lightgray'),
             height=400
         )
-        st.plotly_chart(fig2_plotly, use_container_width=True)
+        st.plotly_chart(fig_prophet, use_container_width=True)
     except Exception as e:
-        st.warning(f"Não foi possível gerar ARIMA para a base {base}: {e}")
+        st.warning(f"Não foi possível gerar Prophet para a base {base}: {e}")
 
 # === Crescimento percentual ===
 st.subheader("📉 Crescimento Percentual (%) (Interativo)")
