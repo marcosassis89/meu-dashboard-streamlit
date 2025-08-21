@@ -98,7 +98,7 @@ for base in bases_selecionadas:
     serie = df_base['Tamanho (MB)'].values
 
     # Ajusta ordem do ARIMA (pode ser ajustado conforme necessidade)
-    ordem_arima = (1, 1, 1)
+    ordem_arima = (30, 1, 1)
     try:
         modelo = ARIMA(serie, order=ordem_arima)
         modelo_fit = modelo.fit()
