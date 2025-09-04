@@ -6,9 +6,8 @@ import numpy as np
 import plotly.express as px
 import io
 from datetime import timedelta
-from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.stattools import adfuller
-from prophet import Prophet
+from sklearn.linear_model import LinearRegression
 
 # Atualização forçada para commit
 
@@ -91,46 +90,54 @@ fig1_plotly.update_layout(
 st.plotly_chart(fig1_plotly, use_container_width=True)
 
 # === Projeção ARIMA ===
-st.subheader("🔮 Projeção Prophet para os Próximos 90 Dias")
+st.subheader("🔮 Projeção Linear Simples para os Próximos 90 Dias")
 
 for base in bases_selecionadas:
     df_base = df_filtrado[df_filtrado['Base'] == base].copy()
     df_base = df_base.sort_values('Data')
-    # Prophet exige colunas 'ds' (data) e 'y' (valor)
-    df_prophet = df_base.rename(columns={'Data': 'ds', 'Tamanho (MB)': 'y'})[['ds', 'y']]
-    df_prophet['ds'] = pd.to_datetime(df_prophet['ds'])
+    if len(df_base) < 2:
+        st.info(f"Não há dados suficientes para projetar a base {base}.")
+        continue
 
-    try:
-        modelo = Prophet()
-        modelo.fit(df_prophet)
-        # Gerar datas futuras
-        datas_futuras = modelo.make_future_dataframe(periods=90)
-        previsoes = modelo.predict(datas_futuras)
-        # Montar DataFrame para gráfico
-        df_proj = pd.DataFrame({
-            'Data': list(df_prophet['ds']) + list(previsoes['ds'][-90:]),
-            'Tamanho (MB)': list(df_prophet['y']) + list(previsoes['yhat'][-90:]),
-            'Tipo': ['Histórico'] * len(df_prophet) + ['Projeção'] * 90,
-            'Base': [base] * (len(df_prophet) + 90)
-        })
-        fig_prophet = px.line(
-            df_proj,
-            x='Data',
-            y='Tamanho (MB)',
-            color='Tipo',
-            line_dash='Tipo',
-            title=f"Projeção Prophet nos Próximos 90 Dias - {base}",
-            labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho projetado (MB)', 'Tipo': 'Tipo'}
-        )
-        fig_prophet.update_layout(
-            legend_title_text='Tipo',
-            xaxis=dict(showgrid=True, gridcolor='lightgray'),
-            yaxis=dict(showgrid=True, gridcolor='lightgray'),
-            height=400
-        )
-        st.plotly_chart(fig_prophet, use_container_width=True)
-    except Exception as e:
-        st.warning(f"Não foi possível gerar Prophet para a base {base}: {e}")
+    # Preparar dados para regressão
+    df_base['Data_ordinal'] = pd.to_datetime(df_base['Data']).map(pd.Timestamp.toordinal)
+    X = df_base['Data_ordinal'].values.reshape(-1, 1)
+    y = df_base['Tamanho (MB)'].values
+
+    # Ajustar modelo linear
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    # Gerar datas futuras
+    ultima_data = df_base['Data'].max()
+    datas_futuras = [ultima_data + timedelta(days=i) for i in range(1, 91)]
+    datas_futuras_ord = np.array([pd.Timestamp(d).toordinal() for d in datas_futuras]).reshape(-1, 1)
+    previsoes = modelo.predict(datas_futuras_ord)
+
+    # Montar DataFrame para gráfico
+    df_proj = pd.DataFrame({
+        'Data': list(df_base['Data']) + datas_futuras,
+        'Tamanho (MB)': list(df_base['Tamanho (MB)']) + list(previsoes),
+        'Tipo': ['Histórico'] * len(df_base) + ['Projeção'] * 90,
+        'Base': [base] * (len(df_base) + 90)
+    })
+
+    fig_proj = px.line(
+        df_proj,
+        x='Data',
+        y='Tamanho (MB)',
+        color='Tipo',
+        line_dash='Tipo',
+        title=f"Projeção Linear Simples nos Próximos 90 Dias - {base}",
+        labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho projetado (MB)', 'Tipo': 'Tipo'}
+    )
+    fig_proj.update_layout(
+        legend_title_text='Tipo',
+        xaxis=dict(showgrid=True, gridcolor='lightgray'),
+        yaxis=dict(showgrid=True, gridcolor='lightgray'),
+        height=400
+    )
+    st.plotly_chart(fig_proj, use_container_width=True)
 
 # === Crescimento percentual ===
 st.subheader("📉 Crescimento Percentual (%) (Interativo)")
