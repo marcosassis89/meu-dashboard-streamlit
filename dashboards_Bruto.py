@@ -1,0 +1,431 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import streamlit as st
+import numpy as np
+import plotly.express as px
+import io
+from datetime import timedelta
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.stattools import adfuller
+from prophet import Prophet
+
+# Atualização forçada para commit
+
+# === Carregar dados ===
+df = pd.read_excel('data_raw/saida_bancos.xlsx', sheet_name='Crescimento (%)')
+df['Data'] = pd.to_datetime(df['Data'], dayfirst=True).dt.date  # remove hora
+
+# Não precisa criar a coluna 'Tamanho MB', pois já existe 'Tamanho (MB)'
+
+# === Corrigir cálculo de crescimento percentual ===
+df = df.sort_values(['Base', 'Data'])
+def calcular_crescimento_percentual(grupo):
+    grupo = grupo.sort_values('Data').copy()
+    tamanhos = grupo['Tamanho (MB)'].values
+    crescimento = [0.0]
+    for i in range(1, len(tamanhos)):
+        anterior = tamanhos[i - 1]
+        atual = tamanhos[i]
+        variação = ((atual - anterior) / anterior) * 100 if anterior != 0 else 0
+        crescimento.append(variação)
+    grupo['Crescimento (%)'] = crescimento
+    return grupo
+
+df = df.groupby('Base', group_keys=False).apply(calcular_crescimento_percentual)
+
+# === Sidebar ===
+st.sidebar.title("🔎 Filtros")
+bases_disponiveis = sorted(df['Base'].unique())
+base_padrao = bases_disponiveis[:1]
+bases_selecionadas = st.sidebar.multiselect(
+    "Selecione as Bases", bases_disponiveis, default=base_padrao
+)
+data_max = df['Data'].max()
+data_min_padrao = data_max.replace(year=data_max.year - 1)
+periodo = st.sidebar.date_input(
+    "Escolha o intervalo de datas",
+    value=(data_min_padrao, data_max),
+    min_value=df['Data'].min(),
+    max_value=data_max
+)
+inicio = pd.to_datetime(periodo[0])
+fim = pd.to_datetime(periodo[1])
+
+# === Filtrar dados ===
+df_filtrado = df[
+    df['Base'].isin(bases_selecionadas) &
+    (pd.to_datetime(df['Data']) >= inicio) &
+    (pd.to_datetime(df['Data']) <= fim)
+]
+
+# === Título ===
+st.title("📊 Dashboard de Crescimento das Bases de Dados")
+st.write("Acompanhe a evolução, projeções e variações das bases selecionadas.")
+
+# === Alerta automático ===
+if any(df_filtrado['Crescimento (%)'] > 50):
+    st.warning("🚨 Algumas bases tiveram crescimento acima de 50%!")
+
+# === Gráfico com suavização e tendência polinomial ===
+st.subheader("📈 Evolução do Tamanho com Suavização e Tendência (Interativo)")
+
+df_suave = df_filtrado.copy()
+df_suave['Tamanho MB Suave'] = df_suave.groupby('Base')['Tamanho (MB)'].transform(lambda x: x.rolling(window=3, min_periods=1).mean())
+
+fig1_plotly = px.line(
+    df_suave,
+    x='Data',
+    y='Tamanho MB Suave',
+    color='Base',
+    markers=True,
+    title="Tamanho com Média Móvel",
+    labels={'Data': 'Data', 'Tamanho MB Suave': 'Tamanho (MB)', 'Base': 'Base'}
+)
+fig1_plotly.update_layout(
+    legend_title_text='Base',
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray'),
+    height=400
+)
+st.plotly_chart(fig1_plotly, use_container_width=True)
+
+# === Projeção ARIMA ===
+st.subheader("🔮 Projeção Prophet para os Próximos 90 Dias")
+
+for base in bases_selecionadas:
+    df_base = df_filtrado[df_filtrado['Base'] == base].copy()
+    df_base = df_base.sort_values('Data')
+    # Prophet exige colunas 'ds' (data) e 'y' (valor)
+    df_prophet = df_base.rename(columns={'Data': 'ds', 'Tamanho (MB)': 'y'})[['ds', 'y']]
+    df_prophet['ds'] = pd.to_datetime(df_prophet['ds'])
+
+    try:
+        modelo = Prophet()
+        modelo.fit(df_prophet)
+        # Gerar datas futuras
+        datas_futuras = modelo.make_future_dataframe(periods=90)
+        previsoes = modelo.predict(datas_futuras)
+        # Montar DataFrame para gráfico
+        df_proj = pd.DataFrame({
+            'Data': list(df_prophet['ds']) + list(previsoes['ds'][-90:]),
+            'Tamanho (MB)': list(df_prophet['y']) + list(previsoes['yhat'][-90:]),
+            'Tipo': ['Histórico'] * len(df_prophet) + ['Projeção'] * 90,
+            'Base': [base] * (len(df_prophet) + 90)
+        })
+        fig_prophet = px.line(
+            df_proj,
+            x='Data',
+            y='Tamanho (MB)',
+            color='Tipo',
+            line_dash='Tipo',
+            title=f"Projeção Prophet nos Próximos 90 Dias - {base}",
+            labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho projetado (MB)', 'Tipo': 'Tipo'}
+        )
+        fig_prophet.update_layout(
+            legend_title_text='Tipo',
+            xaxis=dict(showgrid=True, gridcolor='lightgray'),
+            yaxis=dict(showgrid=True, gridcolor='lightgray'),
+            height=400
+        )
+        st.plotly_chart(fig_prophet, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Não foi possível gerar Prophet para a base {base}: {e}")
+
+# === Crescimento percentual ===
+st.subheader("📉 Crescimento Percentual (%) (Interativo)")
+
+fig3_plotly = px.line(
+    df_filtrado,
+    x='Data',
+    y='Crescimento (%)',
+    color='Base',
+    markers=True,
+    title="Variação Percentual por Base",
+    labels={'Data': 'Data', 'Crescimento (%)': 'Crescimento (%)', 'Base': 'Base'}
+)
+fig3_plotly.update_layout(
+    legend_title_text='Base',
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray'),
+    height=400
+)
+st.plotly_chart(fig3_plotly, use_container_width=True)
+
+# === Ranking de crescimento ===
+def ranking_crescimento(df):
+    st.subheader("🚀 Ranking de Crescimento (%) (Interativo)")
+
+    df_agg = df_filtrado.groupby('Base').agg({
+        'Crescimento (%)': 'mean',
+        'Tamanho (MB)': lambda x: x.diff().mean()
+    }).sort_values('Crescimento (%)', ascending=False).reset_index()
+    df_agg = df_agg.rename(columns={
+        'Crescimento (%)': 'Crescimento Médio (%)',
+        'Tamanho (MB)': 'Crescimento Médio (MB)'
+    })
+
+    fig4_plotly = px.bar(
+        df_agg.head(10),
+        x='Crescimento Médio (%)',
+        y='Base',
+        orientation='h',
+        title="Ranking de Crescimento (%)",
+        labels={'Crescimento Médio (%)': 'Crescimento Médio (%)', 'Base': 'Base'}
+    )
+    fig4_plotly.update_layout(
+        xaxis=dict(showgrid=True, gridcolor='lightgray'),
+        yaxis=dict(showgrid=True, gridcolor='lightgray'),
+        height=400
+    )
+    st.plotly_chart(fig4_plotly, use_container_width=True)
+
+# Chamada da função (fora da definição)
+ranking_crescimento(df_filtrado)
+
+# === Tabela e download ===
+st.subheader("📋 Tabela de Dados Filtrados")
+st.dataframe(df_filtrado)
+
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+    df_filtrado.to_excel(writer, index=False, sheet_name='Dados Filtrados')
+buffer.seek(0)
+st.download_button(
+    label="⬇️ Baixar Excel dos dados filtrados",
+    data=buffer,
+    file_name='dados_filtrados.xlsx',
+    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+)
+
+# === Definir último mês e ano com base na data mais recente ===
+ultima_data = pd.to_datetime(df['Data']).max()
+ultimo_mes = ultima_data.month
+ultimo_ano = ultima_data.year
+
+# === Filtrar último registro por base no último mês ===
+df_ultimo_mes = df[
+    (pd.to_datetime(df['Data']).dt.month == ultimo_mes) &
+    (pd.to_datetime(df['Data']).dt.year == ultimo_ano)
+].copy()
+
+df_ultimo_mes_atual = (
+    df_ultimo_mes.sort_values('Data')
+    .groupby(['Servidor', 'Base'], as_index=False)
+    .last()
+)
+
+# === Função para gráfico Top 10 por servidor ===
+def plot_top10(df_servidor, servidor_nome, cor):
+    top10 = df_servidor.nlargest(10, 'Tamanho (MB)')
+    st.subheader(f"🏆 Top 10 Bases - Servidor {servidor_nome} ({ultimo_mes:02d}/{ultimo_ano})")
+    fig, ax = plt.subplots(figsize=(10, 4))
+    sns.barplot(data=top10, x='Base', y='Tamanho (MB)', color=cor, ax=ax)
+    ax.set_title(f"Top 10 Bases - Servidor {servidor_nome} ({ultimo_mes:02d}/{ultimo_ano})")
+    ax.set_xlabel("Base")
+    ax.set_ylabel("Tamanho (MB)")
+    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, axis='y', linestyle='--', linewidth=0.5)
+    ax.grid(True, axis='x', linestyle='--', linewidth=0.5)
+    st.pyplot(fig)
+
+# === Gráficos Top 10 por servidor ===
+df_s5 = df_ultimo_mes_atual[df_ultimo_mes_atual['Servidor'] == 's5']
+df_s6 = df_ultimo_mes_atual[df_ultimo_mes_atual['Servidor'] == 's6']
+
+if not df_s5.empty:
+    plot_top10(df_s5, '5', 'gold')
+else:
+    st.info("ℹ️ Nenhum dado disponível para o Servidor 5 no último mês.")
+
+if not df_s6.empty:
+    plot_top10(df_s6, '6', 'deepskyblue')
+else:
+    st.info("ℹ️ Nenhum dado disponível para o Servidor 6 no último mês.")
+
+# Agrupa por servidor e data, somando o tamanho total das bases
+df_total_evolucao = (
+    df.groupby(['Servidor', 'Data'], as_index=False)['Tamanho (MB)'].sum()
+    .sort_values(['Servidor', 'Data'])
+)
+
+# Gráfico de linha interativo: evolução do total por servidor ao longo do tempo
+st.subheader("📈 Evolução do Total de Dados por Servidor")
+
+fig_evolucao_total = px.line(
+    df_total_evolucao,
+    x='Data',
+    y='Tamanho (MB)',
+    color='Servidor',
+    markers=True,
+    title="Evolução do Total de Dados por Servidor",
+    labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho Total (MB)', 'Servidor': 'Servidor'}
+)
+fig_evolucao_total.update_layout(
+    legend_title_text='Servidor',
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray'),
+    height=400
+)
+st.plotly_chart(fig_evolucao_total, use_container_width=True)
+
+# === Crescimento por base com seleção de servidor e filtro por data ===
+st.subheader("📊 Crescimento por Base por Servidor e Período")
+
+# Garantir que a coluna 'Diferença (MB)' esteja em formato numérico
+df['Diferença (MB)'] = pd.to_numeric(df['Diferença (MB)'], errors='coerce')
+
+# Garantir que a coluna de data esteja em formato datetime
+df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+
+# Selectbox para escolha do servidor
+servidor_selecionado = st.selectbox("Selecione o servidor:", options=['s5', 's6'])
+
+# Filtro de data
+data_min = df['Data'].min()
+data_max = df['Data'].max()
+data_inicio, data_fim = st.date_input("Selecione o intervalo de datas:",
+                                      value=(data_min, data_max),
+                                      min_value=data_min,
+                                      max_value=data_max)
+
+# Filtrar dados conforme seleção
+df_filtrado = df[
+    (df['Servidor'] == servidor_selecionado) &
+    (df['Data'] >= pd.to_datetime(data_inicio)) &
+    (df['Data'] <= pd.to_datetime(data_fim))
+].copy()
+
+# Agrupar por base e calcular crescimento real (final - inicial)
+crescimento_por_base = []
+for base in df_filtrado['Base'].unique():
+    df_base = df_filtrado[df_filtrado['Base'] == base].sort_values('Data')
+    if len(df_base) < 2:
+        continue
+    tamanho_inicial = df_base['Tamanho (MB)'].iloc[0]
+    tamanho_final = df_base['Tamanho (MB)'].iloc[-1]
+    crescimento_mb = tamanho_final - tamanho_inicial
+    crescimento_por_base.append({
+        'Base': base,
+        'Tamanho Inicial (MB)': tamanho_inicial,
+        'Tamanho Final (MB)': tamanho_final,
+        'Crescimento (MB)': crescimento_mb
+    })
+
+crescimento_por_base_df = pd.DataFrame(crescimento_por_base).sort_values('Crescimento (MB)', ascending=False)
+
+# Mostrar tabela
+st.dataframe(crescimento_por_base_df)
+
+# Slider para limitar número de bases no gráfico
+top_n = st.slider("Número de bases a exibir no gráfico:", min_value=5, max_value=30, value=15)
+dados_grafico = crescimento_por_base_df.head(top_n)
+
+# Gráfico horizontal para melhor legibilidade
+fig, ax = plt.subplots(figsize=(10, len(dados_grafico) * 0.4))
+palette = sns.color_palette("Purples", len(dados_grafico)) if servidor_selecionado == 's5' else sns.color_palette("magma", len(dados_grafico))
+sns.barplot(data=dados_grafico, y='Base', x='Crescimento (MB)', palette=palette, ax=ax)
+
+# Títulos e rótulos
+ax.set_title(f"Crescimento por Base - Servidor {servidor_selecionado} ({data_inicio} a {data_fim})")
+ax.set_xlabel("Crescimento (MB)")
+ax.set_ylabel("Base")
+ax.grid(True, axis='x', linestyle='--', linewidth=0.5)
+
+# Exibir gráfico
+st.pyplot(fig)
+
+# Mostrar crescimento total
+crescimento_total = crescimento_por_base_df['Crescimento (MB)'].sum()
+st.markdown(f"**📦 Crescimento total do servidor {servidor_selecionado} no período:** `{crescimento_total:.2f} MB`")
+
+# === Evolução do Tamanho por Base no Período Selecionado ===
+st.subheader("📈 Evolução do Tamanho por Base no Período Selecionado")
+
+# Limite de alerta para crescimento em MB
+limite_alerta_mb = st.slider("Defina o limite de alerta para crescimento (MB):", min_value=1.0, max_value=100.0, value=20.0)
+
+# Calcular crescimento absoluto e percentual por base
+df_evolucao = df_filtrado.sort_values(['Base', 'Data']).copy()
+bases = df_evolucao['Base'].unique()
+
+dados_crescimento = []
+for base in bases:
+    df_base = df_evolucao[df_evolucao['Base'] == base]
+    if len(df_base) < 2:
+        continue
+    tamanho_inicial = df_base['Tamanho (MB)'].iloc[0]
+    tamanho_final = df_base['Tamanho (MB)'].iloc[-1]
+    crescimento_mb = tamanho_final - tamanho_inicial
+    crescimento_pct = ((tamanho_final - tamanho_inicial) / tamanho_inicial) * 100 if tamanho_inicial != 0 else 0
+    dados_crescimento.append({
+        'Base': base,
+        'Tamanho Inicial (MB)': tamanho_inicial,
+        'Tamanho Final (MB)': tamanho_final,
+        'Crescimento (MB)': crescimento_mb,
+        'Crescimento (%)': crescimento_pct
+    })
+
+df_crescimento = pd.DataFrame(dados_crescimento)
+df_crescimento = df_crescimento.sort_values('Crescimento (MB)', ascending=False)
+
+# Destacar bases com crescimento acima do limite
+bases_alerta = df_crescimento[df_crescimento['Crescimento (MB)'] > limite_alerta_mb]
+if not bases_alerta.empty:
+    st.warning(f"🚨 {len(bases_alerta)} base(s) tiveram crescimento acima de {limite_alerta_mb:.2f} MB no período selecionado.")
+    st.dataframe(bases_alerta.style.format({
+        'Tamanho Inicial (MB)': '{:.2f}',
+        'Tamanho Final (MB)': '{:.2f}',
+        'Crescimento (MB)': '{:.2f}',
+        'Crescimento (%)': '{:.2f}%'
+    }))
+else:
+    st.info("✅ Nenhuma base ultrapassou o limite de crescimento definido.")
+
+# Mostrar tabela completa
+st.markdown("### 📋 Crescimento por Base no Período")
+st.dataframe(df_crescimento.style.format({
+    'Tamanho Inicial (MB)': '{:.2f}',
+    'Tamanho Final (MB)': '{:.2f}',
+    'Crescimento (MB)': '{:.2f}',
+    'Crescimento (%)': '{:.2f}%'
+}))
+
+# Slider para definir o percentual mínimo de crescimento
+percentual_minimo = st.slider(
+    "Percentual mínimo de crescimento para exibir no gráfico (%)",
+    min_value=0.0, max_value=50.0, value=5.0, step=0.5
+)
+
+# Filtrar as bases que atingiram o percentual mínimo
+bases_filtradas = df_crescimento[df_crescimento['Crescimento (%)'] >= percentual_minimo]['Base'].tolist()
+df_evolucao_filtrada = df_evolucao[df_evolucao['Base'].isin(bases_filtradas)]
+
+# Gráfico de linha por base (apenas bases filtradas)
+st.markdown("### 📈 Evolução Interativa do Tamanho por Base (Filtrado pelo crescimento mínimo)")
+
+fig_plotly = px.line(
+    df_evolucao_filtrada,
+    x='Data',
+    y='Tamanho (MB)',
+    color='Base',
+    markers=True,
+    title=f"Evolução do Tamanho por Base - Servidor {servidor_selecionado} (Crescimento ≥ {percentual_minimo:.1f}%)",
+    labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho (MB)', 'Base': 'Base'}
+)
+fig_plotly.update_layout(
+    legend_title_text='Base',
+    xaxis=dict(showgrid=True, gridcolor='lightgray'),
+    yaxis=dict(showgrid=True, gridcolor='lightgray'),
+    height=600
+)
+st.plotly_chart(fig_plotly, use_container_width=True)
+
+
+
+
+
+
+
+
+
