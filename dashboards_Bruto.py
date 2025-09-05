@@ -58,7 +58,7 @@ df_filtrado = df[
 ]
 
 # === Título ===
-st.title("📊 Dashboard de Crescimento das Bases de Dados")
+st.title("📊 Dashboard de Crescimento das Bases de Dados Bruto")
 st.write("Acompanhe a evolução, projeções e variações das bases selecionadas.")
 
 # === Alerta automático ===
