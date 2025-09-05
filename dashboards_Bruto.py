@@ -6,7 +6,6 @@ import numpy as np
 import plotly.express as px
 import io
 from datetime import timedelta
-from statsmodels.tsa.stattools import adfuller
 from sklearn.linear_model import LinearRegression
 
 # Atualização forçada para commit
@@ -275,6 +274,56 @@ fig_evolucao_total.update_layout(
     height=400
 )
 st.plotly_chart(fig_evolucao_total, use_container_width=True)
+
+# === Projeção LINEAR Simples para os servidores ===
+st.subheader("🔮 Projeção Linear Simples para os Próximos 90 Dias por Servidor")
+
+for servidor in ['s5', 's6']:
+    df_servidor = df_total_evolucao[df_total_evolucao['Servidor'] == servidor].copy()
+    df_servidor = df_servidor.sort_values('Data')
+    if len(df_servidor) < 2:
+        st.info(f"Não há dados suficientes para projetar o servidor {servidor}.")
+        continue
+
+    # Preparar dados para regressão
+    df_servidor['Data_ordinal'] = pd.to_datetime(df_servidor['Data']).map(pd.Timestamp.toordinal)
+    X = df_servidor['Data_ordinal'].values.reshape(-1, 1)
+    y = df_servidor['Tamanho (MB)'].values
+
+    # Ajustar modelo linear
+    modelo = LinearRegression()
+    modelo.fit(X, y)
+
+    # Gerar datas futuras
+    ultima_data = df_servidor['Data'].max()
+    datas_futuras = [ultima_data + timedelta(days=i) for i in range(1, 91)]
+    datas_futuras_ord = np.array([pd.Timestamp(d).toordinal() for d in datas_futuras]).reshape(-1, 1)
+    previsoes = modelo.predict(datas_futuras_ord)
+
+    # Montar DataFrame para gráfico
+    df_proj = pd.DataFrame({
+        'Data': list(df_servidor['Data']) + datas_futuras,
+        'Tamanho (MB)': list(df_servidor['Tamanho (MB)']) + list(previsoes),
+        'Tipo': ['Histórico'] * len(df_servidor) + ['Projeção'] * 90,
+        'Servidor': [servidor] * (len(df_servidor) + 90)
+    })
+
+    fig_proj = px.line(
+        df_proj,
+        x='Data',
+        y='Tamanho (MB)',
+        color='Tipo',
+        line_dash='Tipo',
+        title=f"Projeção Linear Simples nos Próximos 90 Dias - Servidor {servidor}",
+        labels={'Data': 'Data', 'Tamanho (MB)': 'Tamanho projetado (MB)', 'Tipo': 'Tipo'}
+    )
+    fig_proj.update_layout(
+        legend_title_text='Tipo',
+        xaxis=dict(showgrid=True, gridcolor='lightgray'),
+        yaxis=dict(showgrid=True, gridcolor='lightgray'),
+        height=400
+    )
+    st.plotly_chart(fig_proj, use_container_width=True)
 
 # === Crescimento por base com seleção de servidor e filtro por data ===
 st.subheader("📊 Crescimento por Base por Servidor e Período")
