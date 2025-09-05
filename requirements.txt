@@ -8,6 +8,7 @@ openpyxl
 plotly==5.15.0
 pillow>=7.1.0,<10
 XlsxWriter
+beautifulsoup4
 
 
 
