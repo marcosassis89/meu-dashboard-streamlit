@@ -6,6 +6,7 @@ import numpy as np
 import plotly.express as px
 import io
 from datetime import timedelta
+from sklearn.linear_model import LinearRegression
 
 # Atualização forçada para commit
 
